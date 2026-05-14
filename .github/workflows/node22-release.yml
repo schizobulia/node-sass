@@ -1,0 +1,140 @@
+name: Build Node 22 binaries and upload release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  NODE_VERSION: "22.22.2"
+  SKIP_SASS_BINARY_DOWNLOAD_FOR_CI: "true"
+
+jobs:
+  build-native:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-x64
+            os: ubuntu-22.04
+            architecture: x64
+          - target: macos-x64
+            os: macos-13
+            architecture: x64
+          - target: windows-x64
+            os: windows-2022
+            architecture: x64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        id: setup-python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          architecture: ${{ matrix.architecture }}
+
+      - name: Install Linux build tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y make g++
+
+      - name: Install packages and build binding
+        run: npm install --unsafe-perm
+        env:
+          PYTHON: ${{ steps.setup-python.outputs.python-path }}
+          GYP_MSVS_VERSION: "2022"
+          npm_config_msvs_version: "2022"
+
+      - name: Run tests
+        run: npm test
+
+      - name: Stage binary for release
+        run: |
+          node -e "const fs = require('fs'); const path = require('path'); const ext = require('./lib/extensions'); const src = ext.getBinaryPath(); const dest = path.join('dist', ext.getBinaryName()); fs.mkdirSync('dist', { recursive: true }); fs.copyFileSync(src, dest); console.log(src + ' -> ' + dest);"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+
+  build-alpine:
+    name: Build alpine-x64
+    runs-on: ubuntu-22.04
+    container:
+      image: node:22.22.2-alpine
+
+    steps:
+      - name: Install Alpine build tools
+        run: apk add --no-cache python3 make git gcc g++
+
+      - uses: actions/checkout@v4
+
+      - name: Install packages and build binding
+        run: npm install --unsafe-perm
+
+      - name: Run tests
+        run: npm test
+
+      - name: Stage binary for release
+        run: |
+          node -e "const fs = require('fs'); const path = require('path'); const ext = require('./lib/extensions'); const src = ext.getBinaryPath(); const dest = path.join('dist', ext.getBinaryName()); fs.mkdirSync('dist', { recursive: true }); fs.copyFileSync(src, dest); console.log(src + ' -> ' + dest);"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: alpine-x64
+          path: dist/*
+          if-no-files-found: error
+
+  upload-release:
+    name: Upload binaries to GitHub Release
+    runs-on: ubuntu-22.04
+    needs:
+      - build-native
+      - build-alpine
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Upload assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          package_version="$(node -p "require('./package.json').version")"
+          release_tag="${GITHUB_REF_NAME}"
+
+          ls -la release-assets
+
+          if ! gh release view "${release_tag}" >/dev/null 2>&1; then
+            gh release create "${release_tag}" \
+              --target "${GITHUB_SHA}" \
+              --title "node-sass ${package_version} - ${release_tag}" \
+              --notes "Prebuilt node-sass ${package_version} binaries for Node.js ${NODE_VERSION}."
+          fi
+
+          gh release upload "${release_tag}" release-assets/* --clobber

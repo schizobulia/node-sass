@@ -37,6 +37,11 @@
         '<!(node -e "require(\'nan\')")',
       ],
       'conditions': [
+        ['OS=="win"', {
+          'defines': [
+            'NOMINMAX'
+          ]
+        }],
         ['libsass_ext == "" or libsass_ext == "no"', {
           'dependencies': [
             'src/libsass.gyp:libsass',

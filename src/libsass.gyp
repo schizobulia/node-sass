@@ -91,7 +91,8 @@
             'VCCLCompilerTool': {
               'AdditionalOptions': [
                 '/GR',
-                '/EHsc'
+                '/EHsc',
+                '/std:c++17'
               ]
             }
           },

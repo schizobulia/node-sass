@@ -22,9 +22,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - target: linux-x64
-            os: ubuntu-22.04
-            architecture: x64
           - target: macos-x64
             os: macos-15-intel
             architecture: x64
@@ -50,10 +47,6 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           architecture: ${{ matrix.architecture }}
 
-      - name: Install Linux build tools
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y make g++
-
       - name: Install packages and build binding
         run: npm install --unsafe-perm
         env:
@@ -74,20 +67,24 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
-  build-alpine:
-    name: Build alpine-x64
+  build-linux-x64:
+    name: Build linux-x64
     runs-on: ubuntu-22.04
     container:
-      image: node:22.22.2-alpine
+      image: node:22.22.2-bullseye
 
     steps:
-      - name: Install Alpine build tools
-        run: apk add --no-cache python3 make git gcc g++
-
       - uses: actions/checkout@v4
+
+      - name: Install Linux build tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends python3 make g++
 
       - name: Install packages and build binding
         run: npm install --unsafe-perm
+        env:
+          PYTHON: /usr/bin/python3
 
       - name: Run tests
         run: npm test
@@ -98,7 +95,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: alpine-x64
+          name: linux-x64
           path: dist/*
           if-no-files-found: error
 
@@ -107,7 +104,7 @@ jobs:
     runs-on: ubuntu-22.04
     needs:
       - build-native
-      - build-alpine
+      - build-linux-x64
 
     steps:
       - uses: actions/checkout@v4

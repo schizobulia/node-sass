@@ -14,58 +14,58 @@ env:
   SKIP_SASS_BINARY_DOWNLOAD_FOR_CI: "true"
 
 jobs:
-  build-native:
-    name: Build ${{ matrix.target }}
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: macos-x64
-            os: macos-15-intel
-            architecture: x64
-          - target: macos-arm64
-            os: macos-latest
-            architecture: arm64
-          - target: windows-x64
-            os: windows-2022
-            architecture: x64
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Python
-        id: setup-python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Setup Node.js ${{ env.NODE_VERSION }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          architecture: ${{ matrix.architecture }}
-
-      - name: Install packages and build binding
-        run: npm install --unsafe-perm
-        env:
-          PYTHON: ${{ steps.setup-python.outputs.python-path }}
-          GYP_MSVS_VERSION: "2022"
-          npm_config_msvs_version: "2022"
-
-      - name: Run tests
-        run: npm test
-
-      - name: Stage binary for release
-        run: |
-          node -e "const fs = require('fs'); const path = require('path'); const ext = require('./lib/extensions'); const src = ext.getBinaryPath(); const dest = path.join('dist', ext.getBinaryName()); fs.mkdirSync('dist', { recursive: true }); fs.copyFileSync(src, dest); console.log(src + ' -> ' + dest);"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.target }}
-          path: dist/*
-          if-no-files-found: error
+  # build-native:
+  #   name: Build ${{ matrix.target }}
+  #   runs-on: ${{ matrix.os }}
+  #
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       include:
+  #         - target: macos-x64
+  #           os: macos-15-intel
+  #           architecture: x64
+  #         - target: macos-arm64
+  #           os: macos-latest
+  #           architecture: arm64
+  #         - target: windows-x64
+  #           os: windows-2022
+  #           architecture: x64
+  #
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #
+  #     - name: Setup Python
+  #       id: setup-python
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: "3.11"
+  #
+  #     - name: Setup Node.js ${{ env.NODE_VERSION }}
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: ${{ env.NODE_VERSION }}
+  #         architecture: ${{ matrix.architecture }}
+  #
+  #     - name: Install packages and build binding
+  #       run: npm install --unsafe-perm
+  #       env:
+  #         PYTHON: ${{ steps.setup-python.outputs.python-path }}
+  #         GYP_MSVS_VERSION: "2022"
+  #         npm_config_msvs_version: "2022"
+  #
+  #     - name: Run tests
+  #       run: npm test
+  #
+  #     - name: Stage binary for release
+  #       run: |
+  #         node -e "const fs = require('fs'); const path = require('path'); const ext = require('./lib/extensions'); const src = ext.getBinaryPath(); const dest = path.join('dist', ext.getBinaryName()); fs.mkdirSync('dist', { recursive: true }); fs.copyFileSync(src, dest); console.log(src + ' -> ' + dest);"
+  #
+  #     - uses: actions/upload-artifact@v4
+  #       with:
+  #         name: ${{ matrix.target }}
+  #         path: dist/*
+  #         if-no-files-found: error
 
   build-linux-x64:
     name: Build linux-x64
@@ -103,7 +103,7 @@ jobs:
     name: Upload binaries to GitHub Release
     runs-on: ubuntu-22.04
     needs:
-      - build-native
+      # - build-native
       - build-linux-x64
 
     steps:
